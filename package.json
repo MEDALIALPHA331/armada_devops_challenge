@@ -7,7 +7,9 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "run:local": "node dist/src/server.js",
-    "start": "pnpm build && pnpm run:local",
+    "start:local": "pnpm build && pnpm run:local",
+    "start": "pnpm build && pm2 start dist/src/server.js --name \"armada_api\"",
+    "stop": "pm2 stop \"armada_api\"",
     "check": "tsc --noEmit",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
@@ -31,5 +33,8 @@
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.2.2",
     "vitest": "^0.34.6"
+  },
+  "dependencies": {
+    "pm2": "^5.3.0"
   }
 }
