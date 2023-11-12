@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js LTS
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.9.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Set environment variable
+        run: echo "NODE_ENV=ci" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Type-check
+        run: pnpm check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm format
+
+      - name: Test
+        run: pnpm test
