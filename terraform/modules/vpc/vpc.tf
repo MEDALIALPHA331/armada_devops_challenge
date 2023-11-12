@@ -181,9 +181,10 @@ resource "aws_launch_template" "main" {
 
   user_data = base64encode(<<-EOF
           #!/bin/bash
-          sudo apt-get update
+          apt-get update
           cd ~ && touch hello.txt && echo "hello armada" > hello.txt
-          sudo apt-get install -y git
+          apt-get install -y git nginx 
+          systemctl enable nginx
           curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
