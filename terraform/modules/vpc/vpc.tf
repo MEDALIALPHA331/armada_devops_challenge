@@ -171,34 +171,26 @@ resource "aws_security_group" "allow_http_ssh" {
 }
 
 
-
 resource "aws_launch_template" "main" {
   name_prefix = "armadav2"
   image_id      = "ami-00983e8a26e4c9bd9" #  Debian AMI
   instance_type = "t2.micro"
-  key_name      = "ssh_key" 
-  vpc_security_group_ids = [ aws_security_group.allow_http_ssh.id ]
+  key_name      = "ssh_private_key" 
 
   user_data = base64encode(<<-EOF
           #!/bin/bash
           apt-get update
-          cd ~ && touch hello.txt && echo "hello armada" > hello.txt
           apt-get install -y git nginx 
           systemctl enable nginx
-          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
-          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
-          nvm install node
+          apt-get install -y nodejs 
           npm install -g pnpm
-          git clone https://github.com/MEDALIALPHA331/devopsv2 /home/ubuntu/app
+          git clone https://github.com/MEDALIALPHA331/armada_devops_challenge /home/ubuntu/app
           cd /home/ubuntu/app
           pnpm install
           pnpm start
           sleep 60
           EOF
   )
-
 
   lifecycle {
     create_before_destroy = true
@@ -212,19 +204,13 @@ resource "aws_launch_template" "main" {
 
 
 
-resource "aws_instance" "foo" {
-  subnet_id = aws_subnet.ccPublicSubnet1.id
-  launch_template {
-    id = aws_launch_template.main.id
-  }
-}
+# resource "aws_instance" "foo" {
+#   subnet_id = aws_subnet.ccPublicSubnet1.id
+#   launch_template {
+#     id = aws_launch_template.main.id
+#   }
+# }
 
-resource "aws_instance" "bar" {
-  subnet_id = aws_subnet.ccPrivateSubnet1.id
-  launch_template {
-    id = aws_launch_template.main.id
-  }
-}
 
 # Define the load balancer
 resource "aws_lb" "main" {
@@ -232,13 +218,13 @@ resource "aws_lb" "main" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.allow_http_ssh.id]
-  subnets            = [aws_subnet.ccPublicSubnet1.id, aws_subnet.ccPrivateSubnet1.id]
+  subnets            = [aws_subnet.ccPrivateSubnet1.id, aws_subnet.ccPublicSubnet2.id]
 }
 
 # Define the target group
 resource "aws_lb_target_group" "main" {
-  name     = "main-tg"
-  port     = 8000     
+  name     = "tgapi"
+  port     = 8000   
   protocol = "HTTP"
   vpc_id   = aws_vpc.daliVPC.id
 }
@@ -253,4 +239,62 @@ resource "aws_lb_listener" "main" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.main.arn
   }
+}
+
+resource "aws_autoscaling_group" "main" {
+  desired_capacity     = 2
+  max_size             = 4                # THIS IS BASED ON NEEDS OFC
+  min_size             = 1
+  health_check_type    = "EC2"
+  vpc_zone_identifier  = [aws_subnet.ccPrivateSubnet1.id, aws_subnet.ccPublicSubnet2.id, aws_subnet.ccPublicSubnet1.id, aws_subnet.ccPrivateSubnet2.id]
+
+  target_group_arns = [aws_lb_target_group.main.arn]
+
+
+  launch_template {
+    id = aws_launch_template.main.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "main-asg"
+    propagate_at_launch = true
+  }
+}
+
+
+# Monitoring and alerts
+# SNS topic for sending email notifications
+resource "aws_sns_topic" "cpu_high" {
+  name = "cpu-high"
+}
+
+# email subscription for the SNS topic
+resource "aws_sns_topic_subscription" "cpu_high" {
+  topic_arn = aws_sns_topic.cpu_high.arn
+  protocol  = "email"
+  endpoint  = "medali.khaled.swe@gmail.com" # my email address
+}
+
+# CloudWatch metric alarm: CPU utilizations 70%
+resource "aws_cloudwatch_metric_alarm" "cpu_high" {
+  alarm_name          = "cpu-high"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Average"
+  threshold           = "70"
+  alarm_description   = "This metric checks for high CPU utilization"
+  alarm_actions       = [aws_sns_topic.cpu_high.arn]
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.main.name
+  }
+}
+
+output "lb_dns_name" {
+  description = "The DNS name of the load balancer"
+  value       = aws_lb.main.dns_name
 }
