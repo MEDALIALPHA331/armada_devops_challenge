@@ -126,3 +126,94 @@ resource "aws_route_table_association" "ccPrivateRTassociation2" {
   subnet_id      = aws_subnet.ccPrivateSubnet2.id
   route_table_id = aws_route_table.ccPrivateRT2.id
 }
+
+
+# Define a security group that allows inbound HTTP and SSH traffic from a specific IP address
+resource "aws_security_group" "allow_http_ssh" {
+  name        = "allow_http_ssh"
+  description = "Allow inbound HTTP and SSH traffic"
+  vpc_id      = aws_vpc.daliVPC.id
+
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # should replace with specific IP address for security
+    description = "HTTP"
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # same
+    description = "SSH"
+  }
+
+  
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # same
+    description = "HTTPS"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
+  }
+
+}
+
+
+
+resource "aws_launch_template" "main" {
+  name_prefix = "armadav2"
+  image_id      = "ami-00983e8a26e4c9bd9" #  Debian AMI
+  instance_type = "t2.micro"
+  key_name      = "ssh_key" 
+  vpc_security_group_ids = [ aws_security_group.allow_http_ssh.id ]
+
+  user_data = base64encode(<<-EOF
+          #!/bin/bash
+          sudo apt-get update
+          cd ~ && touch hello.txt && echo "hello armada" > hello.txt
+          sudo apt-get install -y git
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
+          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
+          nvm install node
+          npm install -g pnpm
+          git clone https://github.com/MEDALIALPHA331/devopsv2 /home/ubuntu/app
+          cd /home/ubuntu/app
+          pnpm install
+          pnpm start
+          sleep 60
+          EOF
+  )
+
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups = [aws_security_group.allow_http_ssh.id]
+  }
+}
+
+
+
+resource "aws_instance" "foo" {
+  subnet_id = aws_subnet.ccPublicSubnet1.id
+  launch_template {
+    id = aws_launch_template.main.id
+  }
+}
