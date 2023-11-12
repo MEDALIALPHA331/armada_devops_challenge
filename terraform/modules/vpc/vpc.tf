@@ -217,3 +217,39 @@ resource "aws_instance" "foo" {
     id = aws_launch_template.main.id
   }
 }
+
+resource "aws_instance" "bar" {
+  subnet_id = aws_subnet.ccPrivateSubnet1.id
+  launch_template {
+    id = aws_launch_template.main.id
+  }
+}
+
+# Define the load balancer
+resource "aws_lb" "main" {
+  name               = "main-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.allow_http_ssh.id]
+  subnets            = [aws_subnet.ccPublicSubnet1.id, aws_subnet.ccPrivateSubnet1.id]
+}
+
+# Define the target group
+resource "aws_lb_target_group" "main" {
+  name     = "main-tg"
+  port     = 8000     
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.daliVPC.id
+}
+
+# Define the listener
+resource "aws_lb_listener" "main" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.main.arn
+  }
+}
