@@ -210,8 +210,11 @@ resource "aws_launch_template" "main" {
           # Install dependencies 
           pnpm install
 
+          #Build the app
+          pnpm build
+        
           # Start app
-          pm2 start server.js
+          pm2 start dist/src/server.js --name "armada_api"
 
           # Logs
           pm2 logs
