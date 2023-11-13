@@ -27,6 +27,8 @@
    - `cd terraform`
    - `terraform init` to create the backend
    - `terraform plan` to see the provisioned resources
-   - `terraform apply` to apply the provisioned resources
+   - `terraform apply` and approve to apply the provisioned resources
 4. to destroy the resources:
    - `terraform destroy`
+
+> note that the first time initializing terraform the s3 backend should be commented out to create the bucket and the other backend component and uncomment to init the state in the bucket.

@@ -18,3 +18,8 @@ output "cc_private_subnets" {
     aws_subnet.ccPrivateSubnet2
   ]
 }
+
+output "lb_dns_name" {
+  description = "The DNS name of the load balancer"
+  value       = aws_lb.main.dns_name
+}
