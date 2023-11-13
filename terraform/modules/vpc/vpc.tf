@@ -2,7 +2,7 @@ resource "aws_vpc" "daliVPC" {
   cidr_block       = var.vpc_cidr
   instance_tenancy = "default"
   tags = {
-    Name    = "daliVPC"
+    Name = "daliVPC"
   }
 }
 
@@ -10,13 +10,13 @@ resource "aws_internet_gateway" "daliIGW" {
   vpc_id = aws_vpc.daliVPC.id
 
   tags = {
-    Name    = "daliIGW"
+    Name = "daliIGW"
   }
 }
 
 resource "aws_eip" "ccNatGatewayEIP1" {
   tags = {
-    Name    = "ccNatGatewayEIP1"
+    Name = "ccNatGatewayEIP1"
   }
 }
 
@@ -24,7 +24,7 @@ resource "aws_nat_gateway" "ccNatGateway1" {
   allocation_id = aws_eip.ccNatGatewayEIP1.id
   subnet_id     = aws_subnet.ccPublicSubnet1.id
   tags = {
-    Name    = "ccNatGateway1"
+    Name = "ccNatGateway1"
   }
 }
 
@@ -35,20 +35,20 @@ resource "aws_subnet" "ccPublicSubnet1" {
   availability_zone = var.availability_zones[0]
 
   tags = {
-    Name    = "ccPublicSubnet1"
+    Name = "ccPublicSubnet1"
   }
 }
 
 resource "aws_eip" "ccNatGatewayEIP2" {
   tags = {
-    Name    = "ccNatGatewayEIP2"
+    Name = "ccNatGatewayEIP2"
   }
 }
 resource "aws_nat_gateway" "ccNatGateway2" {
   allocation_id = aws_eip.ccNatGatewayEIP2.id
   subnet_id     = aws_subnet.ccPublicSubnet1.id
   tags = {
-    Name    = "ccNatGateway2"
+    Name = "ccNatGateway2"
   }
 }
 
@@ -57,7 +57,7 @@ resource "aws_subnet" "ccPublicSubnet2" {
   cidr_block        = var.public_subnet_cidrs[1]
   availability_zone = var.availability_zones[1]
   tags = {
-    Name    = "ccPublicSubnet2"
+    Name = "ccPublicSubnet2"
   }
 }
 
@@ -66,7 +66,7 @@ resource "aws_subnet" "ccPrivateSubnet1" {
   cidr_block        = var.private_subnet_cidrs[0]
   availability_zone = var.availability_zones[0]
   tags = {
-    Name    = "ccPrivateSubnet1"
+    Name = "ccPrivateSubnet1"
   }
 }
 resource "aws_subnet" "ccPrivateSubnet2" {
@@ -74,7 +74,7 @@ resource "aws_subnet" "ccPrivateSubnet2" {
   cidr_block        = var.private_subnet_cidrs[1]
   availability_zone = var.availability_zones[1]
   tags = {
-    Name    = "ccPrivateSubnet2"
+    Name = "ccPrivateSubnet2"
   }
 }
 
@@ -85,7 +85,7 @@ resource "aws_route_table" "ccPublicRT" {
     gateway_id = aws_internet_gateway.daliIGW.id
   }
   tags = {
-    Name    = "ccPublicRT"
+    Name = "ccPublicRT"
   }
 }
 resource "aws_route_table" "ccPrivateRT1" {
@@ -95,7 +95,7 @@ resource "aws_route_table" "ccPrivateRT1" {
     nat_gateway_id = aws_nat_gateway.ccNatGateway1.id
   }
   tags = {
-    Name    = "ccPrivateRT1"
+    Name = "ccPrivateRT1"
   }
 }
 
@@ -106,7 +106,7 @@ resource "aws_route_table" "ccPrivateRT2" {
     nat_gateway_id = aws_nat_gateway.ccNatGateway2.id
   }
   tags = {
-    Name    = "ccPrivateRT2"
+    Name = "ccPrivateRT2"
   }
 }
 
@@ -151,7 +151,15 @@ resource "aws_security_group" "allow_http_ssh" {
     description = "SSH"
   }
 
-  
+  ingress {
+    from_port   = 8000
+    to_port     = 8000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP"
+  }
+
+
   ingress {
     from_port   = 443
     to_port     = 443
@@ -172,25 +180,44 @@ resource "aws_security_group" "allow_http_ssh" {
 
 
 resource "aws_launch_template" "main" {
-  name_prefix = "armadav2"
+  name_prefix   = "armadav2"
   image_id      = "ami-00983e8a26e4c9bd9" #  Debian AMI
   instance_type = "t2.micro"
-  key_name      = "ssh_private_key" 
+  key_name      = "ssh_private_key"
 
   user_data = base64encode(<<-EOF
           #!/bin/bash
-          apt-get update
-          apt-get install -y git nginx 
-          systemctl enable nginx
-          apt-get install -y nodejs 
-          npm install -g pnpm
-          git clone https://github.com/MEDALIALPHA331/armada_devops_challenge /home/ubuntu/app
+
+          # Update packages and install prerequisites
+          sudo apt update
+          sudo apt install -y git curl
+
+          # Install Node.js v20.9.0 LTS
+          curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+
+          # Install NPM
+          npm install -g npm
+
+          # Install pnpm and pm2 globally 
+          npm install -g pnpm pm2
+
+          # Create app directory and clone repo
+          mkdir -p /home/ubuntu/app
           cd /home/ubuntu/app
+          git clone https://github.com/MEDALIALPHA331/armada_devops_challenge .
+
+          # Install dependencies 
           pnpm install
-          pnpm start
-          sleep 60
+
+          # Start app
+          pm2 start server.js
+
+          # Logs
+          pm2 logs
           EOF
   )
+
 
   lifecycle {
     create_before_destroy = true
@@ -198,7 +225,7 @@ resource "aws_launch_template" "main" {
 
   network_interfaces {
     associate_public_ip_address = true
-    security_groups = [aws_security_group.allow_http_ssh.id]
+    security_groups             = [aws_security_group.allow_http_ssh.id]
   }
 }
 
@@ -223,8 +250,9 @@ resource "aws_lb" "main" {
 
 # Define the target group
 resource "aws_lb_target_group" "main" {
-  name     = "tgapi"
-  port     = 8000   
+  name = "tgapi"
+  port = 8000
+  # port     = 80     # FOR TEST WITH NGINX
   protocol = "HTTP"
   vpc_id   = aws_vpc.daliVPC.id
 }
@@ -241,18 +269,27 @@ resource "aws_lb_listener" "main" {
   }
 }
 
+# resource "aws_lb_target_group_attachment" "alb_asg_attachment" {
+#  target_group_arn = aws_lb_target_group.main.arn
+#  target_id       = aws_autoscaling_group.main.id
+#  port            = 8000
+# }
+
+
+
 resource "aws_autoscaling_group" "main" {
-  desired_capacity     = 2
-  max_size             = 4                # THIS IS BASED ON NEEDS OFC
-  min_size             = 1
-  health_check_type    = "EC2"
-  vpc_zone_identifier  = [aws_subnet.ccPrivateSubnet1.id, aws_subnet.ccPublicSubnet2.id, aws_subnet.ccPublicSubnet1.id, aws_subnet.ccPrivateSubnet2.id]
+  desired_capacity    = 2
+  max_size            = 4 # THIS IS BASED ON NEEDS OFC
+  min_size            = 1
+  health_check_type   = "EC2"
+  vpc_zone_identifier = [aws_subnet.ccPrivateSubnet1.id, aws_subnet.ccPublicSubnet2.id]
+  # vpc_zone_identifier  = [aws_subnet.ccPrivateSubnet1.id, aws_subnet.ccPublicSubnet2.id, aws_subnet.ccPublicSubnet1.id, aws_subnet.ccPrivateSubnet2.id]
 
   target_group_arns = [aws_lb_target_group.main.arn]
 
 
   launch_template {
-    id = aws_launch_template.main.id
+    id      = aws_launch_template.main.id
     version = "$Latest"
   }
 
