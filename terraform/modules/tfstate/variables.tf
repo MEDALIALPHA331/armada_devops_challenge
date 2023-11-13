@@ -1,9 +1,11 @@
 variable "bucket_name" {
-  description = "Remote S3 Bucket Name"
+  description = "The name of the S3 bucket. Must be globally unique."
   type        = string
+  default = "tf-state-backend-1532489amp"
+}
 
-  validation {
-    condition     = can(regex("^([a-z0-9]{1}[a-z0-9-]{1,61}[a-z0-9]{1})$", var.bucket_name))
-    error_message = "Bucket Name must not be empty and must follow S3 naming rules."
-  }
+variable "table_name" {
+  description = "The name of the DynamoDB table. Must be unique in this AWS account."
+  type        = string
+  default = "terraform-remote-state-dynamo"
 }

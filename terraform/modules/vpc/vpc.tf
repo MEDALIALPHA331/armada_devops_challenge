@@ -1,6 +1,11 @@
 resource "aws_vpc" "daliVPC" {
   cidr_block       = var.vpc_cidr
   instance_tenancy = "default"
+
+  # DNS Config
+  enable_dns_support  = true
+  enable_dns_hostnames = true
+
   tags = {
     Name = "daliVPC"
   }

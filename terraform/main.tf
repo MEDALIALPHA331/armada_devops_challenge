@@ -1,12 +1,13 @@
 terraform {
 
-  # backend "s3" {
-  #   bucket         = "tf-state-backend"
-  #   key            = "tf-infra/terraform.tfstate"
-  #   region         = "eu-west-3"
-  #   dynamodb_table = "terraform-state-locking"
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket         = "tf-state-backend-1532489amp"
+    key            = "tf-infra/terraform.tfstate"
+    region         = "eu-west-3"
+    dynamodb_table = "terraform-state-locking"
+    encrypt        = true
+  }
+
 
   required_providers {
     aws = {
@@ -23,11 +24,11 @@ provider "aws" {
 }
 
 
-# module "tf-state" {
-#   source      = "./modules/tfstate"
-#   bucket_name = "tf-state-backend"
-# }
+module "tf_state" {
+  source = "./modules/tfstate"
 
+  # bucket_name = "tf-state-backend"
+}
 
 module "vpc-infra" {
   source = "./modules/vpc"

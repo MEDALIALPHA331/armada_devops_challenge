@@ -1,7 +1,8 @@
 import http from 'node:http';
 
 function rootRequestHandler(req: http.IncomingMessage, res: http.ServerResponse) {
-  res.end('Hello Armada');
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({ content: 'Hello Armada' }));
 }
 
 const server = http.createServer(rootRequestHandler);
